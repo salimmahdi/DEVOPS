@@ -16,7 +16,6 @@
 
     <build>
         <plugins>
-            <!-- Plugin pour créer un JAR exécutable -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -24,8 +23,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <!-- Trouvez et mettez votre classe principale ici -->
-                            <mainClass>org.example.App</mainClass>
+                            <mainClass>org.example.Main</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
