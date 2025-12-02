@@ -1,29 +1,57 @@
 pipeline {
     agent any
 
-    stages {
+    tools {
+        maven 'Maven3'  // À configurer dans Jenkins
+        jdk 'JDK17'     // À configurer dans Jenkins
+    }
 
-        stage('Clean & Build') {
+    stages {
+        stage('Checkout') {
             steps {
-                sh 'mvn clean install -DskipTests -B'
+                git branch: 'main',
+                    url: 'https://github.com/salimmahdi/mon-project.git'
+            }
+        }
+
+        stage('Build & Test') {
+            steps {
+                sh 'mvn clean package'  // Inclut compile, test, package
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t chbaycha/devops-project:latest .'
+                script {
+                    // Vérifie si Dockerfile existe
+                    if (fileExists('Dockerfile')) {
+                        sh 'docker build -t mon-project:${BUILD_NUMBER} .'
+                        sh 'docker tag mon-project:${BUILD_NUMBER} mon-project:latest'
+                    } else {
+                        echo 'Pas de Dockerfile trouvé, étape Docker ignorée'
+                    }
+                }
             }
         }
 
         stage('Push Docker Image') {
+            when {
+                expression { fileExists('Dockerfile') }
+            }
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub',
-                                                 usernameVariable: 'DOCKER_USER',
-                                                 passwordVariable: 'DOCKER_PASS')]) {
-                    sh """
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker push chbaycha/devops-project:latest
-                    """
+                script {
+                    // Nécessite credentials Docker Hub dans Jenkins
+                    withCredentials([usernamePassword(
+                        credentialsId: 'docker-hub-credentials',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
+                        sh '''
+                            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                            docker push mon-project:${BUILD_NUMBER}
+                            docker push mon-project:latest
+                        '''
+                    }
                 }
             }
         }
@@ -31,7 +59,16 @@ pipeline {
 
     post {
         always {
-            echo "Pipeline terminée"
+            echo 'Pipeline terminé'
+            // Nettoyage
+            sh 'docker system prune -f || true'
+        }
+        success {
+            echo '✅ Pipeline terminé avec succès !'
+            // Ici vous pourriez ajouter des notifications
+        }
+        failure {
+            echo '❌ Pipeline échoué.'
         }
     }
 }
