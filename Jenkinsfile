@@ -1,9 +1,14 @@
 pipeline {
     agent any
 
+    tools {
+        maven 'Maven3'
+        jdk 'JDK17'
+    }
+
     environment {
         DOCKER_IMAGE = "chbaycha/devops-project"
-        KUBE_NAMESPACE = "default"
+        SONARQUBE_SERVER = "sonarqube"
     }
 
     stages {
@@ -17,7 +22,28 @@ pipeline {
 
         stage('Build Maven') {
             steps {
-                sh 'mvn clean package -DskipTests'
+                sh 'mvn clean verify'
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('sonarqube') {
+                    sh '''
+                        mvn sonar:sonar \
+                        -Dsonar.projectKey=devops-project \
+                        -Dsonar.host.url=http://192.168.56.3:9000 \
+                        -Dsonar.login=$SONAR_AUTH_TOKEN
+                    '''
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
             }
         }
 
@@ -35,9 +61,7 @@ pipeline {
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
-                    sh '''
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                    '''
+                    sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
                 }
             }
         }
@@ -63,10 +87,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ CI/CD + Kubernetes déployé avec succès'
+            echo '✅ Docker + SonarQube + Kubernetes déployés avec succès'
         }
         failure {
-            echo '❌ Pipeline échoué'
+            echo '❌ Pipeline échouée'
         }
     }
 }
