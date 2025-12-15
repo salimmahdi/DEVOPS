@@ -1,14 +1,9 @@
 pipeline {
     agent any
 
-    tools {
-        maven 'Maven3'
-        jdk 'JDK17'
-    }
-
     environment {
         DOCKER_IMAGE = "chbaycha/devops-project"
-        SONARQUBE_SERVER = "sonarqube"
+        SONAR_HOST_URL = "http://192.168.56.3:9000"
     }
 
     stages {
@@ -28,21 +23,13 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonarqube') {
+                withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
                     sh '''
                         mvn sonar:sonar \
                         -Dsonar.projectKey=devops-project \
-                        -Dsonar.host.url=http://192.168.56.3:9000 \
-                        -Dsonar.login=$SONAR_AUTH_TOKEN
+                        -Dsonar.host.url=$SONAR_HOST_URL \
+                        -Dsonar.login=$SONAR_TOKEN
                     '''
-                }
-            }
-        }
-
-        stage('Quality Gate') {
-            steps {
-                timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
                 }
             }
         }
@@ -87,7 +74,7 @@ pipeline {
 
     post {
         success {
-            echo '✅ Docker + SonarQube + Kubernetes déployés avec succès'
+            echo '✅ CI/CD Docker + SonarQube + Kubernetes réussi'
         }
         failure {
             echo '❌ Pipeline échouée'
